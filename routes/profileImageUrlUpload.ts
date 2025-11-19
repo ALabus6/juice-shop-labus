@@ -19,6 +19,26 @@ export function profileImageUrlUpload () {
       const url = req.body.imageUrl
       if (url.match(/(.)*solve\/challenges\/server-side(.)*/) !== null) req.app.locals.abused_ssrf_bug = true
       const loggedInUser = security.authenticatedUsers.get(req.cookies.token)
+
+      // SSRF mitigation: restrict image URL to allowed hostnames
+      let hostname
+      try {
+        hostname = new URL(url).hostname
+      } catch (e) {
+        next(new Error('Invalid URL'))
+        return
+      }
+      const allowedHostnames = [
+        'images.unsplash.com',
+        'cdn.pixabay.com',
+        'i.imgur.com',
+        'yourdomain.com' // <--- Replace or add safe domains as needed
+      ]
+      if (!allowedHostnames.includes(hostname)) {
+        next(new Error('Image URL hostname not allowed'))
+        return
+      }
+
       if (loggedInUser) {
         try {
           const response = await fetch(url)
